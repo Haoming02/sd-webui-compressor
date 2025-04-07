@@ -4,6 +4,7 @@ import gradio as gr
 import torch
 from modules.script_callbacks import on_ui_tabs
 from safetensors.torch import load_file, save_file
+from tqdm import tqdm
 
 MODELS: list[str] = None
 
@@ -23,7 +24,7 @@ def convert_to_fp8(idx: int):
     keys_fp16 = []
 
     print("parsing...")
-    for key, weight in sd.items():
+    for key, weight in tqdm(sd.items()):
         if key.startswith("model.diffusion_model"):
             sd_fp8[key] = weight.to(torch.float8_e4m3fn)
         elif weight.dtype != torch.float16:
@@ -39,6 +40,7 @@ def convert_to_fp8(idx: int):
     print("saving...")
     save_file(sd_fp8, output)
 
+    print("Done!")
     gr.Info("Done!")
 
 
@@ -51,10 +53,22 @@ def editor_ui():
 
     with gr.Blocks() as FP8_EDITOR:
         with gr.Row():
-            target = gr.Dropdown(value=models[0], choices=models, type="index")
-            button = gr.Button(value="Convert", variant="primary")
+            target = gr.Dropdown(
+                label="Checkpoint",
+                value=models[0],
+                choices=models,
+                type="index",
+                scale=4,
+            )
+            target.do_not_save_to_config = True
 
-        button.click(fn=convert_to_fp8, inputs=[target])
+            button = gr.Button(
+                value="Convert",
+                variant="primary",
+                scale=1,
+            )
+            button.do_not_save_to_config = True
+            button.click(fn=convert_to_fp8, inputs=[target])
 
     return [(FP8_EDITOR, "Compressor", "sd-webui-fp8")]
 
